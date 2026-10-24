@@ -16,6 +16,7 @@ if (project.hasProperty(projectKey)) {
 dependencies {
     compileOnly(project(":core:api"))
     runtimeOnly(project(":core:internal"))
+    runtimeOnly(libs.logback)
     implementation(project(":core:pump"))
     implementation(libs.minestom)
 }
@@ -31,6 +32,8 @@ tasks.named<ShadowJar>("shadowJar") {
         exclude(project(":core:internal"))
         exclude(project(":core:pump"))
         exclude(dependency("com.github.luben:zstd-jni:.*"))
+        exclude(dependency("org.slf4j:.*"))
+        exclude(dependency("ch.qos.logback:.*"))
     }
 
     destinationDirectory.set(rootProject.layout.buildDirectory.dir("network-jars"))
@@ -39,15 +42,15 @@ tasks.named<ShadowJar>("shadowJar") {
 tasks.register<JavaExec>("runServer") {
     group = "application"
 
-    val appExtension = extensions.getByType<JavaApplication>()
+    val appExtension = project.extensions.getByType<JavaApplication>()
     mainClass.set(appExtension.mainClass)
 
-    val javaExtension = extensions.getByType<JavaPluginExtension>()
+    val javaExtension = project.extensions.getByType<JavaPluginExtension>()
     val mainSourceSet = javaExtension.sourceSets.named("main")
     classpath = mainSourceSet.map { it.runtimeClasspath }.get()
 
     standardInput = System.`in`
 
     systemProperty("minestom.development", "true")
-    notCompatibleWithConfigurationCache("La tarea runServer interactiva con entrada estándar de consola no es compatible con el Configuration Cache.")
+    notCompatibleWithConfigurationCache("Not compatible with ConfigurationCache")
 }

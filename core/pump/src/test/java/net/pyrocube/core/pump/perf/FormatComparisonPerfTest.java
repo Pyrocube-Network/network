@@ -21,10 +21,7 @@ import net.minestom.server.instance.InstanceContainer;
 import net.minestom.server.instance.anvil.AnvilLoader;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.world.DimensionType;
-import net.pyrocube.core.linear.LinearChunkLoader;
 import net.pyrocube.core.pump.minestom.PumpChunkLoader;
-import net.pyrocube.core.linear.LinearOptions;
-import net.pyrocube.core.linear.LinearRegion;
 import net.pyrocube.core.pump.anvil.AnvilRegion;
 import net.pyrocube.core.pump.anvil.AnvilTranscoder;
 import net.pyrocube.core.pump.anvil.BiomeIds;
@@ -65,9 +62,6 @@ class FormatComparisonPerfTest {
                             List.of("minecraft:the_void", "minecraft:plains", "minecraft:desert", "minecraft:forest", "minecraft:taiga"),
                             "minecraft:plains"),
                     UnknownBlockPolicy.FAIL);
-    private final LinearOptions linearV2 =
-            LinearOptions.defaults().withFsync(false).withExecutor(ForkJoinPool.commonPool());
-    private final LinearOptions linearV1 = linearV2.withVersion(LinearOptions.Version.V1);
     private final PumpOptions pumpOptions = PumpOptions.defaults().withDurability(Durability.DEFERRED);
 
     private List<PumpChunk> chunks;
@@ -96,10 +90,6 @@ class FormatComparisonPerfTest {
         write[1] = Bench.median(1, 3, () -> writePump(pumpDir, pumpOptions));
         final double anvilWrite = Bench.median(1, 3, () -> AnvilRegion.write(anvilFile, toAnvil(false)));
         final double anvilWriteParallel = Bench.median(1, 3, () -> AnvilRegion.write(anvilFile, toAnvil(true)));
-        final double linearV2Write = Bench.median(1, 3, () -> writeLinear(v2File, linearV2, false));
-        final double linearV2WriteParallel = Bench.median(1, 3, () -> writeLinear(v2File, linearV2, true));
-        final double linearV1Write = Bench.median(1, 3, () -> writeLinear(v1File, linearV1, false));
-        final double linearV1WriteParallel = Bench.median(1, 3, () -> writeLinear(v1File, linearV1, true));
 
         // ---- sizes
         final long pumpSize = Files.size(pumpDir.resolve("r.0.0.pump"));
@@ -138,26 +128,17 @@ class FormatComparisonPerfTest {
                         })
                         / COLD_READS;
 
-        final double v2Read = Bench.median(1, 5, () -> readLinear(v2File, false));
-        final double v2ReadParallel = Bench.median(1, 5, () -> readLinear(v2File, true));
-        final double v1Read = Bench.median(1, 5, () -> readLinear(v1File, false));
-        final double v1ReadParallel = Bench.median(1, 5, () -> readLinear(v1File, true));
-        final double v2Cold = Bench.median(1, 5, () -> coldLinear(v2File)) / COLD_READS;
-        final double v1Cold = Bench.median(1, 5, () -> coldLinear(v1File)) / COLD_READS;
-
         // ---- round trip: every format must give the chunks back
-        assertEquals(1024, readLinear(v2File, true));
-        assertEquals(1024, readLinear(v1File, true));
         assertEquals(1024, readAnvil(anvilFile, true));
 
         bench.heading("PUMP vs Linear vs Anvil (one full region, 1024 chunks)");
         bench.table("", "PUMP (zstd)", "Linear v2 grid 8 (zstd)", "Linear v1 (zstd)", "Anvil (zlib)");
         bench.row("file size (KiB)", pumpSize / 1024.0, Files.size(v2File) / 1024.0, Files.size(v1File) / 1024.0, Files.size(anvilFile) / 1024.0);
-        bench.row("write, 1 thread (ms)", write[0] * 1000, linearV2Write * 1000, linearV1Write * 1000, anvilWrite * 1000);
-        bench.row("write, " + CORES + " threads (ms)", write[1] * 1000, linearV2WriteParallel * 1000, linearV1WriteParallel * 1000, anvilWriteParallel * 1000);
-        bench.row("read all, 1 thread (ms)", pumpRead * 1000, v2Read * 1000, v1Read * 1000, anvilRead * 1000);
-        bench.row("read all, " + CORES + " threads (ms)", pumpReadParallel * 1000, v2ReadParallel * 1000, v1ReadParallel * 1000, anvilReadParallel * 1000);
-        bench.row("cold single chunk: open + read one (ms)", pumpCold * 1000, v2Cold * 1000, v1Cold * 1000, anvilCold * 1000);
+        bench.row("write, 1 thread (ms)", write[0] * 1000, anvilWrite * 1000);
+        bench.row("write, " + CORES + " threads (ms)", write[1] * 1000, anvilWriteParallel * 1000);
+        bench.row("read all, 1 thread (ms)", pumpRead * 1000, anvilRead * 1000);
+        bench.row("read all, " + CORES + " threads (ms)", pumpReadParallel * 1000, anvilReadParallel * 1000);
+        bench.row("cold single chunk: open + read one (ms)", pumpCold * 1000, anvilCold * 1000);
         bench.note("- Anvil's write only parallelises the NBT build, its container write and zlib stay single threaded; Anvil's cold read goes through readAll (inflates the chunk table lazily, so it is a loose upper bound).");
         bench.note("- Sizes include each format's header, Anvil pads every chunk to 4 KiB sectors.");
     }
@@ -189,8 +170,6 @@ class FormatComparisonPerfTest {
         final Path anvilDir = dir.resolve("mc-anvil"), pumpDir = dir.resolve("mc-pump"), v2Dir = dir.resolve("mc-v2"), v1Dir = dir.resolve("mc-v1");
         final Map<String, Supplier<ChunkLoader>> loaders = new java.util.LinkedHashMap<>();
         loaders.put("PUMP", () -> PumpChunkLoader.forRegionDirectory(pumpDir));
-        loaders.put("Linear v2", () -> new LinearChunkLoader(v2Dir, LinearOptions.defaults()));
-        loaders.put("Linear v1", () -> new LinearChunkLoader(v1Dir, LinearOptions.defaults().withVersion(LinearOptions.Version.V1)));
         loaders.put("Anvil (Minestom AnvilLoader)", () -> new AnvilLoader(anvilDir));
         final Map<String, Path> dirs = Map.of("PUMP", pumpDir, "Linear v2", v2Dir, "Linear v1", v1Dir, "Anvil (Minestom AnvilLoader)", anvilDir);
 
@@ -246,20 +225,6 @@ class FormatComparisonPerfTest {
         return out;
     }
 
-    private void writeLinear(Path file, LinearOptions options, boolean parallel) throws Exception {
-        final CompoundBinaryTag[] nbt = toAnvil(parallel);
-        final byte[][] payload = new byte[1024][];
-        final var ints = parallel ? java.util.stream.IntStream.range(0, 1024).parallel() : java.util.stream.IntStream.range(0, 1024);
-        ints.forEach(i -> payload[i] = unchecked(() -> {
-            final ByteArrayOutputStream out = new ByteArrayOutputStream(16 * 1024);
-            BinaryTagIO.writer().writeNamed(Map.entry("", nbt[i]), out, BinaryTagIO.Compression.NONE);
-            return out.toByteArray();
-        }));
-        final LinearRegion region = LinearRegion.create(0, 0);
-        for (int i = 0; i < 1024; i++) region.setChunk(i, payload[i], 1_700_000_000L);
-        region.write(file, parallel ? options : options.withExecutor(Runnable::run).withZstdWorkers(0));
-    }
-
     /** Returns the number of chunks decoded. */
     private int readAnvil(Path file, boolean parallel) throws Exception {
         final var raw = AnvilRegion.readAll(file, 0, 0);
@@ -268,18 +233,6 @@ class FormatComparisonPerfTest {
 
     private PumpChunk parseAnvil(AnvilRegion.RawChunk raw) throws Exception {
         return transcoder.toPump(raw.parse()).value();
-    }
-
-    private int readLinear(Path file, boolean parallel) throws Exception {
-        final LinearRegion region = LinearRegion.read(file);
-        if (parallel) region.loadAll(ForkJoinPool.commonPool());
-        final var ints = parallel ? java.util.stream.IntStream.range(0, 1024).parallel() : java.util.stream.IntStream.range(0, 1024);
-        return ints.mapToObj(i -> unchecked(() -> parseLinear(region.getChunk(i)))).toList().size();
-    }
-
-    private int coldLinear(Path file) throws Exception {
-        for (int i = 0; i < COLD_READS; i++) parseLinear(LinearRegion.read(file).getChunk(i * 16 + 3));
-        return COLD_READS;
     }
 
     private PumpChunk parseLinear(byte[] payload) throws Exception {

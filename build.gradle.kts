@@ -17,16 +17,12 @@ tasks.register("runNetworkDev") {
     group = "network"
     description = "Deploy a dev version of the entire network."
 
-    val compilableProjects = subprojects.filter { it.subprojects.isEmpty() }
-    dependsOn(compilableProjects.map { it.tasks.named("runServer") })
+    dependsOn(provider { subprojects.flatMap { p -> p.tasks.matching { it.name == "runServer" } } })
 }
 
 
-tasks.register("cleanNetworkRuntime") {
-    description = ""
+tasks.register<Delete>("cleanNetworkRuntime") {
+    description = "Delete the shared run directory."
     group = "network"
-    doLast {
-        val runDir = layout.projectDirectory.dir("run").asFile
-        if (runDir.exists()) runDir.deleteRecursively()
-    }
+    delete(layout.projectDirectory.dir("run"))
 }
