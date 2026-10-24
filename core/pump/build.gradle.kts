@@ -37,8 +37,34 @@ tasks.register<Test>("perfTest") {
 
     // Performance numbers must never be served from the build cache.
     outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
     testLogging {
         showStandardStreams = true
         events("passed", "failed", "skipped")
     }
+}
+
+tasks.register<JavaExec>("convertWorld") {
+    group = "network"
+    description =
+        "Converts a region directory between Anvil and PUMP: " +
+            "-Pmode=anvil-to-pump|pump-to-anvil -Psource=<dir> -Ptarget=<dir> [-PextraArgs=\"--level=6\"]"
+
+    classpath = sourceSets.main.get().runtimeClasspath
+    mainClass.set("net.pyrocube.core.pump.anvil.PumpConvertTool")
+    jvmArgs(nativeAccess)
+
+    val mode = providers.gradleProperty("mode")
+    val source = providers.gradleProperty("source")
+    val target = providers.gradleProperty("target")
+    val extra = providers.gradleProperty("extraArgs").orElse("")
+    argumentProviders.add(
+        CommandLineArgumentProvider {
+            require(mode.isPresent && source.isPresent && target.isPresent) {
+                "Pass -Pmode=anvil-to-pump|pump-to-anvil -Psource=<dir> -Ptarget=<dir>"
+            }
+            listOf(mode.get(), source.get(), target.get()) +
+                extra.get().split(" ").filter { it.isNotBlank() }
+        },
+    )
 }
