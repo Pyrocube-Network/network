@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="GradleMigrationSettings" migrationVersion="1" />
+  <component name="GradleSettings">
+    <option name="linkedExternalProjectsSettings">
+      <GradleProjectSettings>
+        <compositeConfiguration>
+          <compositeBuild compositeDefinitionSource="SCRIPT">
+            <builds>
+              <build path="$PROJECT_DIR$/buildSrc" name="buildSrc">
+                <projects>
+                  <project path="$PROJECT_DIR$/buildSrc" />
+                </projects>
+              </build>
+            </builds>
+          </compositeBuild>
+        </compositeConfiguration>
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="modules">
+          <set>
+            <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/buildSrc" />
+            <option value="$PROJECT_DIR$/core" />
+            <option value="$PROJECT_DIR$/core/api" />
+            <option value="$PROJECT_DIR$/core/internal" />
+            <option value="$PROJECT_DIR$/core/pump" />
+            <option value="$PROJECT_DIR$/lobby" />
+            <option value="$PROJECT_DIR$/mmorpg" />
+            <option value="$PROJECT_DIR$/proxy-plugin" />
+            <option value="$PROJECT_DIR$/skyblock" />
+          </set>
+        </option>
+        <option name="myGradleHome" value="/usr/share/java/gradle" />
+      </GradleProjectSettings>
+    </option>
+  </component>
+</project>
