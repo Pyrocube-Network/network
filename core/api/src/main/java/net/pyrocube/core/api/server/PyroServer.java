@@ -18,10 +18,11 @@ import org.slf4j.Logger;
  *       25565}), where to listen.
  *   <li>{@code VELOCITY_SECRET}, the modern forwarding secret of the proxy. Without it players
  *       authenticate against Mojang directly and a warning is logged, which is only right for local
- *       development.
+ *       development. Ignored when the {@code minestom.development} system property is true.
  * </ul>
  *
- * A shutdown hook calls {@link #stop()}, so SIGTERM and Ctrl+C stop the server cleanly.
+ * <p>Lines typed on stdin run as server commands, {@code stop} included. A shutdown hook calls
+ * {@link #stop()}, so SIGTERM and Ctrl+C stop the server cleanly.
  */
 public abstract class PyroServer {
     private final String name;
@@ -55,11 +56,15 @@ public abstract class PyroServer {
         final long began = System.nanoTime();
         final String host = env("SERVER_HOST", "0.0.0.0");
         final int port = port(env("SERVER_PORT", "25565"));
-        final String secret = env("VELOCITY_SECRET", "");
+        final boolean development = Boolean.getBoolean("minestom.development");
+        final String secret = development ? "" : env("VELOCITY_SECRET", "");
 
         log.info("Starting {}", name);
         final MinecraftServer server;
-        if (secret.isEmpty()) {
+        if (development) {
+            log.info("minestom.development is set: Velocity forwarding disabled");
+            server = MinecraftServer.init();
+        } else if (secret.isEmpty()) {
             log.warn("VELOCITY_SECRET is not set: players authenticate against Mojang directly");
             server = MinecraftServer.init();
         } else {
